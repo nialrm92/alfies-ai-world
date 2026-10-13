@@ -48,8 +48,23 @@ function voiceReply(heard){
  const t=heard.toLowerCase().trim().replace(/[!?.,]/g,'');
  let answer="I'm still learning, Alfie! Try asking about dinosaurs, animals, planets, or ask me to play a game.";
  let destination=null;
+ const games=[
+  ['quiz',/\b(quiz|animal quiz|animal game|guess the animal)\b/],
+  ['learn',/\b(learn|learning|maths?|numbers?|counting|spell|spelling|letters?|phonics|school)\b/],
+  ['story',/\b(story|stories|adventure)\b/],
+  ['draw',/\b(draw|drawing|paint|painting|colour|color|colouring|coloring|picture|art)\b/],
+  ['create',/\b(creature|monster|make a dinosaur|make a dragon|create)\b/]
+ ];
+ const gameRequest=/(play|game|another|different|something else|something new|change|switch|do something)/.test(t);
+ if(gameRequest || /^(the )?(quiz|adventure|story|drawing|maths|learning|creature)( please)?$/.test(t)){
+  for(const [mode,words] of games){if(words.test(t)){destination=mode;break}}
+  if(!destination && gameRequest){
+   showVoiceAnswer(heard,"Of course, Alfie! Would you like the animal quiz, learn and play, an adventure, drawing, or making a creature?");
+   return;
+  }
+ }
  if(/(go home|home screen|main menu|back home)/.test(t)){showVoiceAnswer(heard,"Let's go home!");setTimeout(goHome,900);return}
- if(/(play|open|start|go to|let.s do|let us do|take me to)/.test(t)){
+ if(!destination && /(play|open|start|go to|let.s do|let us do|take me to)/.test(t)){
   if(/(math|spell|learn|number|reading|letters)/.test(t))destination='learn';
   else if(/(animal quiz|quiz|animal game)/.test(t))destination='quiz';
   else if(/(story|adventure)/.test(t))destination='story';
