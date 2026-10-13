@@ -12,10 +12,23 @@
 </div><p class="note">Made for supervised play. No adverts, accounts or purchases. Dave uses built-in answers, not a live AI service. Microphone recognition may use your browser’s speech service and may require an internet connection.</p></section>
 <section id="play" class="hidden"><button class="pill alt" onclick="goHome()">⬅ Home</button><div class="panel"><h2 id="modeTitle"></h2><div id="content"></div></div></section>
 <section id="parent" class="hidden"><button class="pill alt" onclick="goHome()">⬅ Home</button><div class="panel"><h2>🔒 Grown-up settings</h2><p>This prototype works without a server or adverts. Speech uses your device’s available voices; microphone recognition depends on browser support and may send speech to your browser provider for processing. Please supervise microphone use.</p><label><input type="checkbox" id="soundOn" checked> Read prompts aloud</label><p class="small">Stars are saved on this device when local storage is available. The maths and phonics questions are aimed at early primary school.</p><p class="note">This simple maths gate is not a secure parental PIN. Keep supervising Alfie's use.</p></div></section>
-</main><div id="daveDock"><button id="dockMic" onclick="startListening()">🎤 Talk to Dave</button><span id="dockStatus" role="status" aria-live="polite">Ask Dave to play a game, give a hint or tell you something!</span></div><script>
+</main><div id="daveDock"><button id="dockMic" onclick="startListening()">🎤 Talk to Dave</button><button onclick="replayDave()" aria-label="Hear Dave again" style="min-width:48px!important;padding:12px!important;background:#27865a!important">🔊</button><span id="dockStatus" role="status" aria-live="polite">Ask Dave to play a game, give a hint or tell you something!</span></div><script>
 const $=id=>document.getElementById(id);let stars=0;try{stars=Number(localStorage.getItem('alfieStars')||0)}catch(e){}$('stars').textContent=stars;let current='',storyStep=0,question=null,animalIndex=0,followUp='',lastQuestionMode='',lastPrompt='';
 function award(){stars++;$('stars').textContent=stars;try{localStorage.setItem('alfieStars',stars)}catch(e){}}
-function dinoHello(){say('Hello Alfie! I am Dave, your dinosaur friend. Shall we make a creature, go on an adventure, or play a game?')}function say(t){if(!$('soundOn').checked||!('speechSynthesis' in window))return; speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);u.lang='en-GB';u.rate=.86;u.pitch=1.1;const d=$('dino');if(d)d.classList.add('speaking');voiceSpeaking=true;u.onend=()=>{voiceSpeaking=false;if(d)d.classList.remove('speaking');queueNextListen()};u.onerror=()=>{voiceSpeaking=false;if(d)d.classList.remove('speaking');if(autoChat)stopAutoChat()};speechSynthesis.speak(u)}
+function dinoHello(){say('Hello Alfie! I am Dave, your dinosaur friend. Shall we make a creature, go on an adventure, or play a game?')}let lastDaveSpeech='',speechTimer=null;
+function say(t){
+ lastDaveSpeech=t;
+ if(!$('soundOn').checked||!('speechSynthesis' in window))return;
+ if(listening){pendingSpeech=t;return}
+ try{speechSynthesis.cancel()}catch(e){}
+ clearTimeout(speechTimer);
+ const u=new SpeechSynthesisUtterance(t);u.lang='en-GB';u.rate=.86;u.pitch=1.1;
+ const d=$('dino');if(d)d.classList.add('speaking');voiceSpeaking=true;
+ u.onend=()=>{voiceSpeaking=false;if(d)d.classList.remove('speaking')};
+ u.onerror=()=>{voiceSpeaking=false;if(d)d.classList.remove('speaking')};
+ speechTimer=setTimeout(()=>{speechSynthesis.speak(u);if(speechSynthesis.paused)speechSynthesis.resume()},250);
+}
+function replayDave(){say(lastDaveSpeech||"Hello Alfie! It's Dave!")}
 function goHome(){stopAutoChat();$('home').classList.remove('hidden');$('play').classList.add('hidden');$('parent').classList.add('hidden');if('speechSynthesis' in window)speechSynthesis.cancel()}
 function openMode(mode){stopAutoChat();current=mode;$('home').classList.add('hidden');$('play').classList.remove('hidden');$('parent').classList.add('hidden');const titles={create:'🦖 Make a Creature',talk:'🎤 Talk & Discover',story:'🏰 Choose Your Adventure',learn:'🔤 Learn & Play',draw:'🎨 Draw & Colour',quiz:'🐾 Animal Quiz'};$('modeTitle').textContent=titles[mode];({create:creature,talk:talk,story:story,learn:learn,draw:draw,quiz:quiz})[mode]()}
 function choice(text,fn){const b=document.createElement('button');b.className='pill';b.textContent=text;b.onclick=fn;return b}
@@ -26,7 +39,7 @@ function story(){let s=stories[storyStep%stories.length],box=$('content');box.re
 function learn(){const qs=[{q:'What sound does the letter B make at the start of BALL?',a:['Buh','Sss','Mmm'],correct:0},{q:'What is 2 plus 3?',a:['4','5','7'],correct:1},{q:'Which word begins with the same sound as CAT?',a:['Dog','Cup','Sun'],correct:1},{q:'What is 5 minus 2?',a:['3','6','1'],correct:0},{q:'Which letter starts the word FISH?',a:['F','T','P'],correct:0},{q:'How many legs do two ducks have altogether?',a:['2','4','6'],correct:1}];question=qs[Math.random()*qs.length|0];showQuestion(question,learn)}
 function quiz(){const qs=[{q:'Which animal has a long trunk?',a:['🐘 Elephant','🦁 Lion','🐧 Penguin'],correct:0},{q:'Which animal says quack?',a:['🐈 Cat','🦆 Duck','🐄 Cow'],correct:1},{q:'Which animal can change colour to hide?',a:['🦎 Chameleon','🐑 Sheep','🐎 Horse'],correct:0},{q:'Which animal is the biggest?',a:['🐁 Mouse','🐘 Elephant','🐜 Ant'],correct:1}];question=qs[Math.random()*qs.length|0];showQuestion(question,quiz)}
 function showQuestion(q,next){lastQuestionMode=current;lastPrompt=q.q;let box=$('content');box.replaceChildren(setMessage(q.q),choice('🔊 Hear question',()=>say(q.q)));let wrap=document.createElement('div');wrap.className='choices';q.a.forEach((a,i)=>wrap.append(choice(a,()=>{if(i===q.correct){award();box.replaceChildren(setMessage('🌟 Brilliant! You got it!'),choice('Next question ➜',next));say('Brilliant! You got it!')}else{say('Good try! Have another go.')}})));box.append(wrap);say(q.q)}
-let recognizer=null, listening=false, autoChat=false, voiceSpeaking=false, voiceSession=0, voiceRestartTimer=null, voiceHadResult=false;
+let recognizer=null, listening=false, autoChat=false, voiceSpeaking=false, voiceSession=0, voiceRestartTimer=null, voiceHadResult=false, awaitingGameChoice=false, pendingRecognition='', pendingSpeech=null;
 function stopAutoChat(){autoChat=false;voiceSession++;clearTimeout(voiceRestartTimer);try{if(recognizer)recognizer.abort()}catch(e){}listening=false;updateChatControls();}
 function updateChatControls(){const b=$('autoChatButton');if(b)b.textContent=autoChat?'🛑 Stop chatting':'🗣️ Try hands-free chat';const st=$('voiceStatus');if(st&&!autoChat&&st.textContent.includes('Waiting for Dave'))st.textContent='Tap the microphone to talk again.';}
 function queueNextListen(){if(!autoChat||current!=='talk'||voiceSpeaking)return;const session=voiceSession;clearTimeout(voiceRestartTimer);voiceRestartTimer=setTimeout(()=>{if(session===voiceSession&&autoChat&&!listening&&!voiceSpeaking&&current==='talk')startListening(true)},650)}
@@ -56,10 +69,12 @@ function voiceReply(heard){
   ['create',/\b(creature|monster|make a dinosaur|make a dragon|create)\b/]
  ];
  const gameRequest=/(play|game|another|different|something else|something new|change|switch|do something)/.test(t);
- if(gameRequest || /^(the )?(quiz|adventure|story|drawing|maths|learning|creature)( please)?$/.test(t)){
+ if(awaitingGameChoice){const selection=games.find(([mode,words])=>words.test(t));if(selection)destination=selection[0]}
+
+ if(!destination && (gameRequest || /^(the )?(quiz|adventure|story|drawing|maths|learning|creature)( please)?$/.test(t))){
   for(const [mode,words] of games){if(words.test(t)){destination=mode;break}}
   if(!destination && gameRequest){
-   showVoiceAnswer(heard,"Of course, Alfie! Would you like the animal quiz, learn and play, an adventure, drawing, or making a creature?");
+   awaitingGameChoice=true;showVoiceAnswer(heard,"Of course, Alfie! Would you like the animal quiz, learn and play, an adventure, drawing, or making a creature?");
    return;
   }
  }
@@ -96,6 +111,7 @@ function voiceReply(heard){
 function showVoiceAnswer(heard,answer){const heardBox=$('heardText'),reply=$('voiceAnswer');if(heardBox)heardBox.textContent='👂 I heard: '+heard;if(reply)reply.textContent='🦕 Dave: '+answer;setVoiceStatus('🦕 '+answer);say(answer)}
 function setVoiceStatus(message){const st=$('voiceStatus'),dock=$('dockStatus');if(st)st.textContent=message;if(dock)dock.textContent=message}
 function startListening(){
+ pendingRecognition='';
  const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;
  if(!Recognition){setVoiceStatus("This browser can't listen. You can still use the game buttons.");return}
  if(listening)return;
@@ -103,9 +119,9 @@ function startListening(){
  try{
   const r=new Recognition();recognizer=r;r.lang='en-GB';r.continuous=false;r.interimResults=false;r.maxAlternatives=1;
   r.onstart=()=>{listening=true;setVoiceStatus("🔴 Listening! Ask Dave something.");$('dockMic').textContent='🎙️ Listening';const b=$('listenButton');if(b)b.textContent='🎙️ Listening…'};
-  r.onresult=e=>{const heard=e.results[0][0].transcript;setVoiceStatus("Dave heard: "+heard);voiceReply(heard)};
+  r.onresult=e=>{pendingRecognition=e.results[0][0].transcript;setVoiceStatus("Dave heard: "+pendingRecognition)};
   r.onerror=e=>{setVoiceStatus(e.error==='not-allowed'?"Microphone blocked. Allow access in Safari settings.":"I didn't catch that. Tap to try again.")};
-  r.onend=()=>{listening=false;$('dockMic').textContent='🎤 Talk to Dave';const b=$('listenButton');if(b)b.textContent='🎤 Tap to talk to Dave'};
+  r.onend=()=>{listening=false;$('dockMic').textContent='🎤 Talk to Dave';const b=$('listenButton');if(b)b.textContent='🎤 Tap to talk to Dave';if(pendingRecognition){const heard=pendingRecognition;pendingRecognition='';setTimeout(()=>voiceReply(heard),150)}else if(pendingSpeech){const message=pendingSpeech;pendingSpeech=null;setTimeout(()=>say(message),200)}};
   r.start();
  }catch(e){setVoiceStatus("Tap to try again. Safari may need a fresh microphone permission.")}
 }
